@@ -4,7 +4,6 @@
 import re
 import os
 
-
 #  将一个语句拆成有效的部分。处理的是一行字符串
     # A-insturction: @value  => [@, value]
     # C-insturction: dest = comp; jump => [dest, comp, jump] dest and jump may be null.
@@ -24,7 +23,7 @@ def strip(s):
 # parser 接受指令返回一个list装载了各个有效的部分.
 def parser(instruction):
     # 要注意此情况
-    if instruction == '':
+    if instruction == '' or instruction.startswith('('):   # 标号也跳过
         return []
 
     if instruction.startswith("@"):
@@ -101,6 +100,7 @@ jump_table = {
 
 # 翻译到binary code
 def translate(lst):
+    global n     # 变量分配
     # 将int值转换成15位二进制字符串
     def value_to_binary(i):
         res = bin(i).replace('0b', "")
@@ -109,9 +109,19 @@ def translate(lst):
     
     if lst == []:
         return ""
-
+    # 遇到的是变量要处理
     if lst[0] == '@':
+        if lst[1][0].isalpha():    # 首字母
+            v = lst[1]
+            if v in symbol_table:
+                lst[1] = symbol_table[v]
+            else:
+                symbol_table[v] = str(n)
+                lst[1] = str(n)
+                n += 1
+        
         return '0' + value_to_binary(int(lst[1]))
+
     else:
         return "111" + comp_table[lst[1]] + dest_table[lst[0]] + jump_table[lst[2]]
 
@@ -119,12 +129,43 @@ def translate(lst):
 
 
 
-# TODO 处理Symbol(Label, pre-defined, variable)
+# 处理Symbol(Label, pre-defined, variable)
 
+
+# 创建symbol_table
+symbol_table = {
+    "SP": "0",
+    "LCL": "1",
+    "ARG": "2",
+    "THIS": "3",
+    "THAT": "4",
+    "SCREEN": "16384",
+    "KBD": "24576",
+}
+
+for i in range(16):
+    symbol_table["R" + str(i)] = str(i)
+
+
+n = 16
 
 
 # 读取文件 输出文件
 def assembler(path):
+    # 添加标号到symbol_table
+    def first_pass():
+        i = 0
+        with open(path) as f:
+            for line in f:
+                s = strip(line)
+                if s.startswith('('):
+                    symbol_table[s[1:-1]] = str(i)
+                # 确定i值，空白和标号跳过
+                if not(s == "" or s.startswith('(')):
+                    i += 1
+    
+    first_pass()
+    
     name = os.path.basename(path).split(".")[0] + ".hack"
     with open(path) as f:
         with open(name, 'w') as g:
@@ -139,11 +180,13 @@ def assembler(path):
 
 if __name__ == "__main__":
     
-    file_paths = [r"C:\code_learn\com_sys_couresa\assem\Add.asm",
-                  r"C:\code_learn\com_sys_couresa\assem\MaxL.asm",
-                  r"C:\code_learn\com_sys_couresa\assem\PongL.asm",
-                  r"C:\code_learn\com_sys_couresa\assem\RectL.asm"]
+    # file_paths = [
+    #               r"C:\code_learn\com_sys_couresa\Max.asm",
+    #               r"C:\code_learn\com_sys_couresa\Pong.asm",
+    #               r"C:\code_learn\com_sys_couresa\Rect.asm"]
 
-    for path in file_paths:
-        assembler(path)
+    # for path in file_paths:
+    #     assembler(path)
     
+    file_path = r"C:\code_learn\com_sys_couresa\Rect.asm"
+    assembler(file_path)
